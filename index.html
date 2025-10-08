@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Absensi Kelas Online</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            line-height: 1rem;
+            text-transform: uppercase;
+        }
+        .badge-hadir { background-color: #dcfce7; color: #166534; }
+        .badge-sakit { background-color: #fef9c3; color: #854d0e; }
+        .badge-izin { background-color: #cffafe; color: #0891b2; }
+        .badge-alpa { background-color: #fee2e2; color: #991b1b; }
+        #video-container {
+            position: relative;
+            width: 100%;
+            height: 0;
+            padding-bottom: 75%; /* Aspect ratio 4:3 */
+        }
+        #video, #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen">
+
+    <!-- Halaman Login -->
+    <div id="login-page" class="w-full max-w-sm">
+        <div class="bg-white p-8 rounded-xl shadow-lg">
+            <h1 class="text-2xl font-bold text-center text-slate-800 mb-2">Selamat Datang</h1>
+            <p class="text-center text-slate-500 mb-6">Silakan login untuk melanjutkan</p>
+            <form id="login-form">
+                <div class="mb-4">
+                    <label for="username" class="block text-slate-700 text-sm font-semibold mb-2">Username</label>
+                    <input type="text" id="username" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: guru" required>
+                </div>
+                <div class="mb-6">
+                    <label for="password" class="block text-slate-700 text-sm font-semibold mb-2">Password</label>
+                    <input type="password" id="password" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: 12345" required>
+                </div>
+                <p id="login-error" class="text-red-500 text-sm text-center mb-4 hidden"></p>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Login</button>
+            </form>
+        </div>
+        <p class="text-center text-slate-500 text-xs mt-4">&copy; 2024 Aplikasi Absensi Online</p>
+    </div>
+
+    <!-- Halaman Aplikasi Utama -->
+    <div id="main-app" class="hidden w-full max-w-4xl p-4 md:p-0">
+        <div class="bg-white rounded-xl shadow-lg">
+            <!-- Header -->
+            <header class="flex justify-between items-center p-6 border-b border-slate-200">
+                <h1 class="text-xl md:text-2xl font-bold text-slate-800">Aplikasi Absensi Kelas Online</h1>
+                <button id="logout-button" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg text-sm transition duration-300 self-start">Logout</button>
+            </header>
+
+            <main class="p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Form & Face Recognition -->
+                <div class="md:col-span-1">
+                    <!-- Form Absensi Manual -->
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-700">Formulir Absensi</h2>
+                        <p id="current-date" class="text-sm text-slate-500 mb-4"></p>
+                        <form id="attendance-form" class="space-y-4">
+                             <div>
+                                <label for="nama" class="block text-slate-600 text-sm font-medium mb-1">Nama Lengkap</label>
+                                <input type="text" id="nama" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                            </div>
+                            <div>
+                                <label for="kelas" class="block text-slate-600 text-sm font-medium mb-1">Kelas</label>
+                                <input type="text" id="kelas" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                            </div>
+                            <div>
+                                <label for="nomor-absen" class="block text-slate-600 text-sm font-medium mb-1">Nomor Absen</label>
+                                <input type="number" id="nomor-absen" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                            </div>
+                            <div>
+                                <label for="keterangan" class="block text-slate-600 text-sm font-medium mb-1">Keterangan</label>
+                                <select id="keterangan" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                                    <option value="Hadir">Hadir</option>
+                                    <option value="Sakit">Sakit</option>
+                                    <option value="Izin">Izin</option>
+                                    <option value="Alpa">Alpa</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Kirim Absensi</button>
+                        </form>
+                    </div>
+                    
+                    <div class="my-6 text-center">
+                        <span class="text-slate-400 text-xs font-semibold">ATAU</span>
+                    </div>
+
+                    <!-- Face Recognition Section -->
+                    <div>
+                        <button id="start-face-rec-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 flex items-center justify-center gap-2">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-camera" viewBox="0 0 16 16"><path d="M15 12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h1.172a3 3 0 0 0 2.12-.879l.83-.828A1 1 0 0 1 6.827 3h2.344a1 1 0 0 1 .707.293l.828.828A3 3 0 0 0 12.828 5H14a1 1 0 0 1 1 1v6zM2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 9.172 2H6.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 3.172 4H2z"/><path d="M8 11a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5zm0 1a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3 6.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0z"/></svg>
+                            Absen via Wajah
+                        </button>
+                        <div id="face-rec-container" class="mt-4 hidden">
+                            <div id="video-container" class="bg-slate-200 rounded-lg overflow-hidden">
+                                <video id="video" autoplay muted playsinline></video>
+                                <canvas id="canvas"></canvas>
+                            </div>
+                            <p id="face-status" class="text-center text-sm mt-2 text-slate-600">Arahkan wajah ke kamera...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Daftar Absensi -->
+                <div class="md:col-span-2">
+                    <h2 class="text-lg font-semibold text-slate-700 mb-4">Data Absensi Hari Ini</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-100">
+                                <tr>
+                                    <th scope="col" class="px-4 py-3">No</th>
+                                    <th scope="col" class="px-4 py-3">Nama</th>
+                                    <th scope="col" class="px-4 py-3">Kelas</th>
+                                    <th scope="col" class="px-4 py-3">No. Absen</th>
+                                    <th scope="col" class="px-4 py-3">Keterangan</th>
+                                    <th scope="col" class="px-4 py-3">Waktu</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendance-list-body">
+                                <!-- Data akan diisi oleh JavaScript -->
+                                <tr class="bg-white">
+                                    <td colspan="6" class="px-4 py-4 text-center text-slate-400">Belum ada data absensi.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const loginPage = document.getElementById('login-page');
+        const mainApp = document.getElementById('main-app');
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+        const logoutButton = document.getElementById('logout-button');
+        const attendanceForm = document.getElementById('attendance-form');
+        const attendanceListBody = document.getElementById('attendance-list-body');
+
+        // Face Recognition Elements
+        const startFaceRecButton = document.getElementById('start-face-rec-button');
+        const faceRecContainer = document.getElementById('face-rec-container');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const faceStatus = document.getElementById('face-status');
+        let recognitionInterval; // To hold the setInterval ID
+
+        // Data
+        let attendanceData = [];
+        const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
+        
+        // --- DATA SISWA TERDAFTAR UNTUK DEMO ---
+        const registeredStudents = {
+            'Budi Santoso': {
+                name: 'Budi Santoso',
+                studentClass: '12-A',
+                attNumber: '15',
+                // Gambar ini adalah contoh dari pexels.com (free to use)
+                imageUrl: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=500'
+            }
+        };
+
+        async function loadModels() {
+            faceStatus.textContent = 'Memuat model...';
+            await Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+                faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL)
+            ]);
+            faceStatus.textContent = 'Model berhasil dimuat.';
+        }
+        loadModels();
+        
+        function getLabeledFaceDescriptions() {
+            const labels = Object.keys(registeredStudents);
+            return Promise.all(
+                labels.map(async label => {
+                    const student = registeredStudents[label];
+                    const descriptions = [];
+                    // Pakai proxy untuk menghindari masalah CORS
+                    const img = await faceapi.fetchImage(`https://cors-anywhere.herokuapp.com/${student.imageUrl}`);
+                    const detections = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+                    if (detections) {
+                         descriptions.push(detections.descriptor);
+                    }
+                    return new faceapi.LabeledFaceDescriptors(label, descriptions);
+                })
+            );
+        }
+
+        async function startVideo() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+                video.srcObject = stream;
+            } catch (err) {
+                console.error(err);
+                faceStatus.textContent = 'Error: Tidak dapat mengakses kamera.';
+            }
+        }
+
+        function displayCurrentDate() {
+            const dateElement = document.getElementById('current-date');
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateElement.textContent = now.toLocaleDateString('id-ID', options);
+        }
+
+        // Fungsi untuk merender daftar absensi
+        function renderAttendanceList() {
+            attendanceListBody.innerHTML = ''; // Kosongkan tabel
+
+            if (attendanceData.length === 0) {
+                attendanceListBody.innerHTML = `
+                    <tr class="bg-white">
+                        <td colspan="6" class="px-4 py-4 text-center text-slate-400">Belum ada data absensi.</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            const sortedData = [...attendanceData].sort((a, b) => b.timestamp - a.timestamp);
+
+            sortedData.forEach((data, index) => {
+                const row = document.createElement('tr');
+                row.className = 'bg-white border-b';
+
+                const statusClass = { 'Hadir': 'badge-hadir', 'Sakit': 'badge-sakit', 'Izin': 'badge-izin', 'Alpa': 'badge-alpa' }[data.status] || '';
+
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-medium text-slate-900">${sortedData.length - index}</td>
+                    <td class="px-4 py-3">${data.name}</td>
+                    <td class="px-4 py-3">${data.studentClass}</td>
+                    <td class="px-4 py-3 text-center">${data.attNumber}</td>
+                    <td class="px-4 py-3"><span class="badge ${statusClass}">${data.status}</span></td>
+                    <td class="px-4 py-3">${data.timestamp.toLocaleTimeString('id-ID')}</td>
+                `;
+                attendanceListBody.appendChild(row);
+            });
+        }
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if ((username === 'guru' && password === '12345') || (username === 'siswa' && password === 'absen')) {
+                loginPage.classList.add('hidden');
+                mainApp.classList.remove('hidden');
+                loginError.classList.add('hidden');
+                displayCurrentDate(); // Menampilkan tanggal saat login berhasil
+            } else {
+                loginError.textContent = 'Username atau password salah!';
+                loginError.classList.remove('hidden');
+            }
+        });
+        
+        function stopVideoStream() {
+            if (video.srcObject) {
+                const stream = video.srcObject;
+                const tracks = stream.getTracks();
+                tracks.forEach(track => track.stop());
+                video.srcObject = null;
+            }
+        }
+
+        logoutButton.addEventListener('click', () => {
+            mainApp.classList.add('hidden');
+            loginPage.classList.remove('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            // Stop camera if it's running
+            clearInterval(recognitionInterval);
+            stopVideoStream();
+            faceRecContainer.classList.add('hidden');
+        });
+
+        attendanceForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('nama').value;
+            const studentClass = document.getElementById('kelas').value;
+            const attNumber = document.getElementById('nomor-absen').value;
+            const status = document.getElementById('keterangan').value;
+
+            attendanceData.push({ name, studentClass, attNumber, status, timestamp: new Date() });
+            renderAttendanceList();
+            attendanceForm.reset();
+        });
+        
+        startFaceRecButton.addEventListener('click', () => {
+            faceRecContainer.classList.remove('hidden');
+            startVideo();
+        });
+        
+        video.addEventListener('play', async () => {
+            faceStatus.textContent = 'Mempersiapkan data wajah...';
+            const labeledFaceDescriptors = await getLabeledFaceDescriptions();
+            const faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.6);
+            
+            faceStatus.textContent = 'Arahkan wajah ke kamera...';
+            const displaySize = { width: video.clientWidth, height: video.clientHeight };
+            faceapi.matchDimensions(canvas, displaySize);
+
+            recognitionInterval = setInterval(async () => {
+                const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+                faceapi.draw.drawDetections(canvas, resizedDetections);
+                
+                if (resizedDetections.length > 0) {
+                     const result = resizedDetections.map(d => faceMatcher.findBestMatch(d.descriptor));
+                     const bestMatch = result[0];
+                     
+                     if (bestMatch.label !== 'unknown') {
+                        faceStatus.textContent = `Wajah dikenali: ${bestMatch.label}`;
+                        const student = registeredStudents[bestMatch.label];
+                        
+                        // Isi form
+                        document.getElementById('nama').value = student.name;
+                        document.getElementById('kelas').value = student.studentClass;
+                        document.getElementById('nomor-absen').value = student.attNumber;
+                        document.getElementById('keterangan').value = 'Hadir';
+                        
+                        // Hentikan proses
+                        clearInterval(recognitionInterval);
+                        stopVideoStream();
+                        faceRecContainer.classList.add('hidden');
+                        
+                        // Kirim notifikasi
+                        setTimeout(() => alert(`Absensi untuk ${student.name} berhasil. Silakan klik "Kirim Absensi".`), 100);
+                        
+                     } else {
+                        faceStatus.textContent = 'Wajah tidak dikenali.';
+                     }
+                } else {
+                    faceStatus.textContent = 'Tidak ada wajah terdeteksi.';
+                }
+            }, 100);
+        });
+
+        renderAttendanceList();
+    </script>
+</body>
+</html>
