@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aplikasi Absensi Kelas Online</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -151,7 +152,7 @@
                             <tbody id="attendance-list-body">
                                 <!-- Data akan diisi oleh JavaScript -->
                                 <tr class="bg-white">
-                                    <td colspan="6" class="px-4 py-4 text-center text-slate-400">Belum ada data absensi.</td>
+                                    <td colspan="6" class="px-4 py-4 text-center text-slate-400">Menghubungkan ke database...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -188,7 +189,7 @@
                         <tbody id="admin-attendance-list-body">
                             <!-- Data Admin akan diisi oleh JavaScript -->
                              <tr class="bg-white">
-                                <td colspan="6" class="px-4 py-4 text-center text-slate-400">Belum ada data absensi.</td>
+                                <td colspan="6" class="px-4 py-4 text-center text-slate-400">Menghubungkan ke database...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -199,6 +200,16 @@
 
 
     <script>
+        // --- PENGATURAN SUPABASE ---
+        // GANTI DENGAN URL DAN KUNCI ANON SUPABASE ANDA
+        // LIHAT FILE "CARA_MENGHUBUNGKAN.md" UNTUK INSTRUKSI LENGKAP
+        const SUPABASE_URL = 'https://brhhxgdhwmjdzmkulwjp.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJyaGh4Z2Rod21qZHpta3Vsd2pwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzMDExMzUsImV4cCI6MjA3NTg3NzEzNX0.CjSi8_QuwovTFJBvFP0iDL2aYjWClaM29MWDlE2uoNQ';
+
+        const { createClient } = supabase;
+        const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // -------------------------
+
         // DOM Elements
         const loginPage = document.getElementById('login-page');
         const mainApp = document.getElementById('main-app');
@@ -220,7 +231,6 @@
         let recognitionInterval;
 
         // Data
-        let attendanceData = [];
         const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
         
         const registeredStudents = {
@@ -247,7 +257,6 @@
                 faceStatus.textContent = 'Gagal memuat model.';
             }
         }
-        loadModels();
         
         function getLabeledFaceDescriptions() {
             const labels = Object.keys(registeredStudents);
@@ -282,18 +291,30 @@
             dateElement.textContent = now.toLocaleDateString('id-ID', options);
         }
 
-        function renderAttendanceList() {
-            renderTable(attendanceListBody, false);
+        async function fetchInitialData() {
+            const { data, error } = await db.from('absensi').select('*').order('created_at', { ascending: false });
+            if (error) {
+                console.error('Gagal mengambil data awal:', error);
+                alert('Tidak dapat terhubung ke database. Pastikan URL dan Kunci Supabase sudah benar.');
+            } else {
+                renderTable(attendanceListBody, data, false);
+                renderTable(adminAttendanceListBody, data, true);
+            }
         }
 
-        function renderAdminAttendanceList() {
-            renderTable(adminAttendanceListBody, true);
+        function listenForChanges() {
+             db.channel('public:absensi')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'absensi' }, (payload) => {
+                    console.log('Perubahan terdeteksi!', payload);
+                    fetchInitialData(); // Ambil ulang semua data untuk me-refresh tabel
+                })
+                .subscribe();
         }
 
-        function renderTable(tbodyElement, isAdminView) {
+        function renderTable(tbodyElement, data, isAdminView) {
             tbodyElement.innerHTML = ''; 
 
-            if (attendanceData.length === 0) {
+            if (!data || data.length === 0) {
                 tbodyElement.innerHTML = `
                     <tr class="bg-white">
                         <td colspan="6" class="px-4 py-4 text-center text-slate-400">Belum ada data absensi.</td>
@@ -302,21 +323,20 @@
                 return;
             }
             
-            const sortedData = [...attendanceData].sort((a, b) => b.timestamp - a.timestamp);
-
-            sortedData.forEach((data, index) => {
+            data.forEach((item, index) => {
                 const row = document.createElement('tr');
                 row.className = 'bg-white border-b';
 
-                const statusClass = { 'Hadir': 'badge-hadir', 'Sakit': 'badge-sakit', 'Izin': 'badge-izin', 'Alpa': 'badge-alpa' }[data.status] || '';
-                const timeString = isAdminView ? data.timestamp.toLocaleString('id-ID') : data.timestamp.toLocaleTimeString('id-ID');
+                const statusClass = { 'Hadir': 'badge-hadir', 'Sakit': 'badge-sakit', 'Izin': 'badge-izin', 'Alpa': 'badge-alpa' }[item.keterangan] || '';
+                const timestamp = new Date(item.created_at);
+                const timeString = isAdminView ? timestamp.toLocaleString('id-ID') : timestamp.toLocaleTimeString('id-ID');
 
                 row.innerHTML = `
-                    <td class="px-4 py-3 font-medium text-slate-900">${sortedData.length - index}</td>
-                    <td class="px-4 py-3">${data.name}</td>
-                    <td class="px-4 py-3">${data.studentClass}</td>
-                    <td class="px-4 py-3 text-center">${data.attNumber}</td>
-                    <td class="px-4 py-3"><span class="badge ${statusClass}">${data.status}</span></td>
+                    <td class="px-4 py-3 font-medium text-slate-900">${data.length - index}</td>
+                    <td class="px-4 py-3">${item.nama}</td>
+                    <td class="px-4 py-3">${item.kelas}</td>
+                    <td class="px-4 py-3 text-center">${item.nomor_absen}</td>
+                    <td class="px-4 py-3"><span class="badge ${statusClass}">${item.keterangan}</span></td>
                     <td class="px-4 py-3">${timeString}</td>
                 `;
                 tbodyElement.appendChild(row);
@@ -334,22 +354,22 @@
                 if (username === 'adminabsen' && password === 'absenkeren') {
                     loginPage.classList.add('hidden');
                     adminDashboard.classList.remove('hidden');
-                    loginError.classList.add('hidden');
-                    renderAdminAttendanceList();
                     loginSuccess = true;
                 }
             } else if (role === 'user') {
                 if ((username === 'guru' && password === '12345') || (username === 'siswa' && password === 'absen')) {
                     loginPage.classList.add('hidden');
                     mainApp.classList.remove('hidden');
-                    loginError.classList.add('hidden');
                     displayCurrentDate();
-                    renderAttendanceList();
                     loginSuccess = true;
                 }
             }
 
-            if (!loginSuccess) {
+            if (loginSuccess) {
+                 loginError.classList.add('hidden');
+                 fetchInitialData();
+                 listenForChanges();
+            } else {
                 loginError.textContent = 'Username atau password salah untuk peran yang dipilih!';
                 loginError.classList.remove('hidden');
             }
@@ -374,28 +394,46 @@
             clearInterval(recognitionInterval);
             stopVideoStream();
             faceRecContainer.classList.add('hidden');
+            
+            const channel = db.channel('public:absensi');
+            if (channel) {
+                db.removeChannel(channel);
+            }
         }
 
         logoutButton.addEventListener('click', doLogout);
         adminLogoutButton.addEventListener('click', doLogout);
 
-        attendanceForm.addEventListener('submit', (e) => {
+        attendanceForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Mengirim...';
+
             const name = document.getElementById('nama').value;
             const studentClass = document.getElementById('kelas').value;
             const attNumber = document.getElementById('nomor-absen').value;
             const status = document.getElementById('keterangan').value;
 
-            attendanceData.push({ name, studentClass, attNumber, status, timestamp: new Date() });
-            renderAttendanceList();
-            renderAdminAttendanceList();
-            attendanceForm.reset();
+            const { error } = await db.from('absensi').insert([
+                { nama: name, kelas: studentClass, nomor_absen: attNumber, keterangan: status }
+            ]);
+
+            if (error) {
+                console.error('Gagal mengirim data:', error);
+                alert('Gagal mengirim absensi. Silakan coba lagi.');
+            } else {
+                // Data akan di-refresh oleh listener real-time
+                attendanceForm.reset();
+            }
+            submitButton.disabled = false;
+            submitButton.textContent = 'Kirim Absensi';
         });
         
         startFaceRecButton.addEventListener('click', () => {
             faceRecContainer.classList.toggle('hidden');
             if (!faceRecContainer.classList.contains('hidden')) {
-                startVideo();
+                loadModels().then(startVideo);
             } else {
                 clearInterval(recognitionInterval);
                 stopVideoStream();
@@ -440,7 +478,8 @@
                             stopVideoStream();
                             faceRecContainer.classList.add('hidden');
                             
-                            setTimeout(() => alert(`Absensi untuk ${student.name} berhasil. Silakan klik "Kirim Absensi".`), 100);
+                            // Mengganti alert dengan UI yang lebih baik bisa jadi pengembangan selanjutnya
+                            alert(`Wajah ${student.name} dikenali. Silakan klik "Kirim Absensi" untuk konfirmasi.`);
                         } else {
                             faceStatus.textContent = 'Wajah tidak dikenali.';
                         }
@@ -451,9 +490,7 @@
             }, 200);
         });
 
-        // Initial render on load
-        renderAttendanceList();
-        renderAdminAttendanceList();
     </script>
 </body>
 </html>
+
