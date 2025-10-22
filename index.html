@@ -204,7 +204,8 @@
         // GANTI DENGAN URL DAN KUNCI ANON SUPABASE ANDA
         // LIHAT FILE "CARA_MENGHUBUNGKAN.md" UNTUK INSTRUKSI LENGKAP
         const SUPABASE_URL = 'https://brhhxgdhwmjdzmkulwjp.supabase.co'; 
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzIΙNiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJyaGh4Z2Rod21qZHpta3Vsd2pwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzMDExMzUsImV4cCI6MjA3NTg3NzEzNX0.CjSi8_QuwovTFJBvFP0iDL2aYjWClaM29MWDlE2uoNQ';
+        // FIX: Karakter 'Ι' (Greek Iota) telah diganti dengan 'I' (Latin I) yang benar pada kunci di bawah.
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJyaGh4Z2Rod21qZHpta3Vsd2pwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzMDExMzUsImV4cCI6MjA3NTg3NzEzNX0.CjSi8_QuwovTFJBvFP0iDL2aYjWClaM29MWDlE2uoNQ';
 
         const { createClient } = supabase;
         const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
