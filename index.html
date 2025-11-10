@@ -265,7 +265,9 @@
                 labels.map(async label => {
                     const student = registeredStudents[label];
                     const descriptions = [];
-                    const img = await faceapi.fetchImage(`https://cors-anywhere.herokuapp.com/${student.imageUrl}`);
+                    // FIX: Hapus proxy 'cors-anywhere' karena sering tidak stabil.
+                    // Kita akan coba ambil gambar pexels secara langsung.
+                    const img = await faceapi.fetchImage(student.imageUrl);
                     const detections = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
                     if (detections) {
                          descriptions.push(detections.descriptor);
@@ -297,7 +299,12 @@
             const { data, error } = await db.from('absensi').select('*').order('id', { ascending: false });
             if (error) {
                 console.error('Gagal mengambil data awal:', error);
-                alert('Tidak dapat terhubung ke database. Pastikan URL dan Kunci Supabase sudah benar, dan nama tabel adalah "absensi".');
+                // FIX: Berikan pesan error yang lebih spesifik untuk 'Failed to fetch'
+                if (error.message.toLowerCase().includes('failed to fetch')) {
+                    alert('Gagal terhubung ke Supabase. Periksa koneksi internet Anda. Jika internet aman, pastikan proyek Supabase Anda "Aktif" (tidak di-pause) di dashboard Supabase.');
+                } else {
+                    alert(`Error database: ${error.message}. Pastikan URL/Kunci Supabase benar dan nama tabel "absensi" serta kolomnya sesuai.`);
+                }
             } else {
                 renderTable(attendanceListBody, data, false);
                 renderTable(adminAttendanceListBody, data, true);
